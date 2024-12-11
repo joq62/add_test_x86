@@ -18,12 +18,11 @@
 
 %% To be changed when create a new server
 -include("add_test.hrl").
--include("add_test.rd").
+
 %% API
 
 -export([
-	 add/2
-	 
+ 
 	]).
 
 
@@ -33,10 +32,7 @@
 
 
 -export([
-	 template_call/1,
-	 template_cast/1,	 
 	 start/0,
-	 ping/0,
 	 stop/0
 	]).
 
@@ -49,21 +45,12 @@
 -define(SERVER, ?MODULE).
 		     
 -record(state, {
-
 	        
 	       }).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
-%%--------------------------------------------------------------------
-%% @doc
-%% 
-%% @end
-%%--------------------------------------------------------------------
--spec add(A::integer(),B::integer()) -> Sum::integer() | Error::term().
-add(A,B)-> 
-    gen_server:call(?SERVER, {add,A,B},infinity).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -72,32 +59,6 @@ add(A,B)->
 %%--------------------------------------------------------------------
 start()->
     application:start(?MODULE).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Used to check if the application has started correct
-%% @end
-%%--------------------------------------------------------------------
--spec ping() -> pong | Error::term().
-ping()-> 
-    gen_server:call(?SERVER, {ping},infinity).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Used to check if the application has started correct
-%% @end
-%%--------------------------------------------------------------------
--spec template_call(Args::term()) -> {ok,Year::integer(),Month::integer(),Day::integer()} | Error::term().
-template_call(Args)-> 
-    gen_server:call(?SERVER, {template_call,Args},infinity).
-%%--------------------------------------------------------------------
-%% @doc
-%% Used to check if the application has started correct
-%% @end
-%%--------------------------------------------------------------------
--spec template_cast(Args::term()) -> ok.
-template_cast(Args)-> 
-    gen_server:cast(?SERVER, {template_cast,Args}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -132,10 +93,13 @@ stop()-> gen_server:stop(?SERVER).
 	  ignore.
 
 init([]) ->
+    net_adm:world(),
+    MyPid=self(),
+    yes=global:register_name(?MODULE,MyPid),
+    MyPid=global:whereis_name(?MODULE),
+    ?LOG_NOTICE("Server started ",[?MODULE]),
     
-    {ok, #state{
-	    	    
-	   },0}.
+    {ok, #state{}}.
 
 
 %%--------------------------------------------------------------------
@@ -154,47 +118,10 @@ init([]) ->
 	  {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
 	  {stop, Reason :: term(), NewState :: term()}.
 
-handle_call({add,A,B}, _From, State) ->
-    Reply=A+B,
-    {reply, Reply, State};
 
-%%----- TemplateCode ---------------------------------------------------------------
-
-handle_call({template_call,Args}, _From, State) ->
-    Result=try erlang:apply(erlang,date,[])  of
-	      {Y,M,D}->
-		   {ok,Y,M,D};
-	      {error,ErrorR}->
-		   {error,["M:F [A]) with reason",erlang,date,[erlang,date,[]],"Reason=", ErrorR]}
-	   catch
-	       Event:Reason:Stacktrace ->
-		   {error,[#{event=>Event,
-			     module=>?MODULE,
-			     function=>?FUNCTION_NAME,
-			     line=>?LINE,
-			     args=>Args,
-			     reason=>Reason,
-			     stacktrace=>[Stacktrace]}]}
-	   end,
-    Reply=case Result of
-	      {ok,Year,Month,Day}->
-		  NewState=State,
-		  {ok,Year,Month,Day};
-	      {error,ErrorReason}->
-		  NewState=State,
-		  {error,ErrorReason}
-	  end,
-    {reply, Reply,NewState};
-
-%%----- Admin ---------------------------------------------------------------
-
-handle_call({ping}, _From, State) ->
-    Reply=pong,
-    {reply, Reply, State};
 
 handle_call(UnMatchedSignal, From, State) ->
    ?LOG_WARNING("Unmatched signal",[UnMatchedSignal]),
-    io:format("unmatched_signal ~p~n",[{UnMatchedSignal, From,?MODULE,?LINE}]),
     Reply = {error,[unmatched_signal,UnMatchedSignal, From]},
     {reply, Reply, State}.
 
@@ -204,41 +131,11 @@ handle_call(UnMatchedSignal, From, State) ->
 %% Handling cast messages
 %% @end
 %%--------------------------------------------------------------------
-
-
-handle_cast({template_cast,Args}, State) ->
-    Result=try erlang:apply(erlang,date,[])  of
-	      {Year,Month,Day}->
-		   {ok,Year,Month,Day};
-	      {error,ErrorR}->
-		   {error,["M:F [A]) with reason",erlang,date,[erlang,date,[]],"Reason=", ErrorR]}
-	   catch
-	       Event:Reason:Stacktrace ->
-		   {error,[#{event=>Event,
-			     module=>?MODULE,
-			     function=>?FUNCTION_NAME,
-			     line=>?LINE,
-			     args=>Args,
-			     reason=>Reason,
-			     stacktrace=>[Stacktrace]}]}
-	   end,
-    case Result of
-	{ok,_Year,_Month,_Day}->
-	    NewState=State;
-	{error,_ErrorReason}->
-	    NewState=State
-    end,
-    {noreply, NewState};
-
-
-
 handle_cast({stop}, State) ->
-    
     {stop,normal,ok,State};
 
 handle_cast(UnMatchedSignal, State) ->
     ?LOG_WARNING("Unmatched signal",[UnMatchedSignal]),
-    io:format("unmatched_signal ~p~n",[{UnMatchedSignal,?MODULE,?LINE}]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -252,22 +149,19 @@ handle_cast(UnMatchedSignal, State) ->
 	  {noreply, NewState :: term(), Timeout :: timeout()} |
 	  {noreply, NewState :: term(), hibernate} |
 	  {stop, Reason :: normal | term(), NewState :: term()}.
-handle_info(timeout, State) ->
-    initial_trade_resources(),
-    Self=self(),
-    spawn_link(fun()->rd_loop(Self) end),
-    {noreply, State};
-
-handle_info(rd_loop_timeout, State) ->
-    io:format("rd_loop_timeout ~p~n",[{?MODULE,?LINE}]),
-    rd:trade_resources(),
-    timer:sleep(3000),
-    {noreply, State};
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
+handle_info({Pid,{add,A,B}}, State) ->
+  Pid!{self(),{ok,A+B}},
+  {noreply, State};
 
 handle_info(Info, State) ->
     ?LOG_WARNING("Unmatched signal",[Info]),
-    io:format("unmatched_signal ~p~n",[{Info,?MODULE,?LINE}]),
     {noreply, State}.
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -312,14 +206,3 @@ format_status(_Opt, Status) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-rd_loop(Parent)->
-    timer:sleep(?RdTradeInterval),
-    Parent!rd_loop_timeout,
-    rd_loop(Parent).
-
-
-initial_trade_resources()->
-    [rd:add_local_resource(ResourceType,Resource)||{ResourceType,Resource}<-?LocalResourceTuples],
-    [rd:add_target_resource_type(TargetType)||TargetType<-?TargetTypes],
-    rd:trade_resources(),
-    timer:sleep(3000).
