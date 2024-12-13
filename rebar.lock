@@ -1,4 +1,4 @@
 [{<<"common">>,
   {git,"https://github.com/joq62/common.git",
-       {ref,"c5003c4dffe16bcff6d6f49a0396a207da48b798"}},
+       {ref,"dcaea02f9b0e973f1fb5c1577fb839922cb1d076"}},
   0}].
