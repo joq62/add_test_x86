@@ -158,6 +158,17 @@ handle_info({Pid,{add,A,B}}, State) ->
   Pid!{self(),{ok,A+B}},
   {noreply, State};
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Admin 
+%% @end
+%%--------------------------------------------------------------------
+handle_info({Pid,{ping}}, State) ->
+  Pid!{self(),pong},
+  {noreply, State};
+
+
+
 handle_info(Info, State) ->
     ?LOG_WARNING("Unmatched signal",[Info]),
     {noreply, State}.
