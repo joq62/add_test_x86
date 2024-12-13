@@ -41,8 +41,7 @@ start()->
 
 test_1()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    Vm=lib_vm:get_node(?NodeName),
-    42=rpc:call(Vm,add_test,add,[20,22],5000),
+    {ok,42}=sd:call(add_test,{add,20,22},5000),
     ok.
 
 

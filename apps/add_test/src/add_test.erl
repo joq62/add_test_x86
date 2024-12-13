@@ -97,7 +97,7 @@ init([]) ->
     MyPid=self(),
     yes=global:register_name(?MODULE,MyPid),
     MyPid=global:whereis_name(?MODULE),
-    ?LOG_NOTICE("Server started ",[?MODULE]),
+    ?LOG_NOTICE("Server started ",[?MODULE,MyPid]),
     
     {ok, #state{}}.
 

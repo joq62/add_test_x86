@@ -29,6 +29,7 @@
 -define(Foreground,"./"++?ApplDir++"bin/"++?Appl++" "++"foreground").
 -define(Daemon,"./"++?ApplDir++"/bin/"++?Appl++" "++"daemon").
 
+-define(LogFilePath,?Appl++"_container/logs/"++?Appl++"/log.logs/file.1").
 
 %%
 %% --------------------------------------------------------------------
@@ -46,6 +47,10 @@ start()->
     ok=setup(),
     ApplicationToTest=list_to_atom("test_"++?Appl),
     ok=rpc:call(get_node(?NodeName),ApplicationToTest,start,[],10*5000),
+
+    io:format("Test OK !!! ~p~n",[?MODULE]),
+    log_loop([]),
+
 
     file:del_dir_r(?ApplDir),   
     rpc:call(get_node(?NodeName),init,stop,[],5000),
@@ -76,13 +81,17 @@ setup()->
     %% Start application to test and check node started
     []=os:cmd(?Daemon),
     true=check_node_started(get_node(?NodeName)),
-    
+
+    net_adm:world(),
+    MyPid=self(),
+    yes=global:register_name(?MODULE,MyPid),
+    timer:sleep(2*5000),
+        
     %% Check applications are correct started
     pong=rpc:call(get_node(?NodeName),log,ping,[],5000),
-    pong=rpc:call(get_node(?NodeName),rd,ping,[],5000),
-
+    pong=sd:call(add_test,{ping},5000),
     %% Change
-    pong=rpc:call(get_node(?NodeName),?ApplAtom,ping,[],5000),
+    
     ok.
 
 
@@ -142,3 +151,17 @@ check_node_stopped(Node,NumCheck,CheckDelay,false)->
 get_node(NodeName)->
     {ok,Host}=net:gethostname(),
     list_to_atom(NodeName++"@"++Host).
+
+%% --------------------------------------------------------------------
+%% Function: available_hosts()
+%% Description: Based on hosts.config file checks which hosts are avaible
+%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
+%% --------------------------------------------------------------------
+log_loop(Strings)->    
+    Info=os:cmd("cat "++?LogFilePath),
+    NewStrings=string:lexemes(Info,"\n"),
+    
+    [io:format("~p~n",[String])||String<-NewStrings,
+				 false=:=lists:member(String,Strings)],
+    timer:sleep(5*1000),
+    log_loop(NewStrings).

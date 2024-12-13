@@ -58,9 +58,10 @@ eunit:
 	rm -rf *_container;
 #INFO: Creating eunit test code using test_ebin dir;
 	mkdir test_ebin;
-	erlc -o test_ebin test/*.erl;
 	rm -rf common_include;
 	cp -r ~/erlang/common_include .
+	erlc -I ~/erlang/common_include -o test_ebin test/*.erl;
+	erlc -o test_ebin /home/joq62/erlang/new_setup/services/common/src/*.erl;
 	rebar3 release;
 	rebar3 as prod tar;
 	rm -rf tar_dir;
