@@ -93,11 +93,11 @@ stop()-> gen_server:stop(?SERVER).
 	  ignore.
 
 init([]) ->
-    net_adm:world(),
-    MyPid=self(),
-    yes=global:register_name(?MODULE,MyPid),
-    MyPid=global:whereis_name(?MODULE),
-    ?LOG_NOTICE("Server started ",[?MODULE,MyPid]),
+ %   net_adm:world(),
+ %   MyPid=self(),
+ %   yes=global:register_name(?MODULE,MyPid),
+ %   MyPid=global:whereis_name(?MODULE),
+    ?LOG_NOTICE("Server started ",[?MODULE]),
     
     {ok, #state{}}.
 
