@@ -54,11 +54,15 @@
 
 %%--------------------------------------------------------------------
 %% @doc
-%% 
+%% Starts the server
 %% @end
 %%--------------------------------------------------------------------
-start()->
-    application:start(?MODULE).
+-spec start() -> {ok, Pid :: pid()} |
+	  {error, Error :: {already_started, pid()}} |
+	  {error, Error :: term()} |
+	  ignore.
+start() ->
+    gen_server:start(?MODULE, [], []).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -93,12 +97,7 @@ stop()-> gen_server:stop(?SERVER).
 	  ignore.
 
 init([]) ->
- %   net_adm:world(),
- %   MyPid=self(),
- %   yes=global:register_name(?MODULE,MyPid),
- %   MyPid=global:whereis_name(?MODULE),
     ?LOG_NOTICE("Server started ",[?MODULE]),
-    
     {ok, #state{}}.
 
 
@@ -154,18 +153,22 @@ handle_cast(UnMatchedSignal, State) ->
 %% 
 %% @end
 %%--------------------------------------------------------------------
-handle_info({Pid,{add,A,B}}, State) ->
-  Pid!{self(),{ok,A+B}},
-  {noreply, State};
+
+handle_info({request, AliasReqId, {add,A,B}}, State) ->
+    Result = {ok,A+B},
+    AliasReqId ! {reply, AliasReqId, Result},
+    {noreply, State};
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Admin 
 %% @end
 %%--------------------------------------------------------------------
-handle_info({Pid,{ping}}, State) ->
-  Pid!{self(),pong},
-  {noreply, State};
+
+handle_info({request, AliasReqId, {ping,[]}}, State) ->
+    Result = {ok,pong},
+    AliasReqId ! {reply, AliasReqId, Result},
+    {noreply, State};
 
 
 

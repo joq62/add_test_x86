@@ -16,20 +16,20 @@
 
 %% Change
 -define(Appl,"add_test").
--define(Dir,"add_test").
+-define(ExcecFile,"add_test").
+
 -define(ApplAtom,list_to_atom(?Appl)).
-
 -define(NodeName,?Appl).
--define(ApplDir,?Dir++"_container").
--define(TarFile,?Appl++".tar.gz").
--define(TarDir,"tar_dir").
--define(ExecDir,"exec_dir").
--define(GitUrl,"https://github.com/joq62/"++?Appl++"_x86.git ").
 
--define(Foreground,"./"++?ApplDir++"bin/"++?Appl++" "++"foreground").
--define(Daemon,"./"++?ApplDir++"/bin/"++?Appl++" "++"daemon").
+-define(NeededList,[add_test]).
 
--define(LogFilePath,?Appl++"_container/logs/"++?Appl++"/log.logs/file.1").
+%-define(ExecDir,"exec_dir").
+%-define(GitUrl,"https://github.com/joq62/"++?Appl++"_x86.git ").
+
+-define(Foreground,"./_build/default/rel/"++?Appl++"/bin/"++?ExcecFile++" "++"foreground").
+-define(Daemon,"./_build/default/rel/"++?Appl++"/bin/"++?ExcecFile++" "++"daemon").
+
+-define(LogFilePath,"logs/"++?Appl++"/log.logs/file.1").
 
 %%
 %% --------------------------------------------------------------------
@@ -45,14 +45,8 @@
 start()->
    
     ok=setup(),
-    ApplicationToTest=list_to_atom("test_"++?Appl),
-    ok=rpc:call(get_node(?NodeName),ApplicationToTest,start,[],10*5000),
-
-    io:format("Test OK !!! ~p~n",[?MODULE]),
-    log_loop([]),
-
-
-    file:del_dir_r(?ApplDir),   
+    ok=test_1(),
+  
     rpc:call(get_node(?NodeName),init,stop,[],5000),
     true=check_node_stopped(get_node(?NodeName)),
     io:format("Test OK !!! ~p~n",[?MODULE]),
@@ -65,31 +59,50 @@ start()->
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
+test_1()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME,?LINE}]),
+
+    {ok,PidAddTest}=client:server_pid(add_test),
+    {ok,pong}=client:call(PidAddTest,{ping,[]},5000),
+    
+    %% correct
+    {ok,42}=client:call(PidAddTest,{add,20,22},5000),
+
+    %% Bad args - the node crashes
+    {error,["timeout ",PidAddTest,{add,20,xx},5000]}=client:call(PidAddTest,{add,20,xx},5000),
+    {badrpc,nodedown}=rpc:call(get_node(?NodeName),log,ping,[],5000),
+    
+    ok.
+
+
+%% --------------------------------------------------------------------
+%% Function: available_hosts()
+%% Description: Based on hosts.config file checks which hosts are avaible
+%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
+%% --------------------------------------------------------------------
 setup()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME,?LINE}]),
    
-    file:del_dir_r(?ApplDir),
-    file:make_dir(?ApplDir),
-   
-    %% Unpack tar file
-    TarFileFullPath=filename:join([?TarDir,?TarFile]),
-    os:cmd("tar -zxvf "++TarFileFullPath++" "++"-C"++" "++?ApplDir),
-  
+    
+
     rpc:call(get_node(?NodeName),init,stop,[],5000),
     true=check_node_stopped(get_node(?NodeName)),
     io:format("~p~n",[{?MODULE,?FUNCTION_NAME,?LINE}]),
     %% Start application to test and check node started
     []=os:cmd(?Daemon),
     true=check_node_started(get_node(?NodeName)),
-
-    net_adm:world(),
-    MyPid=self(),
-    yes=global:register_name(?MODULE,MyPid),
-    timer:sleep(2*5000),
-        
+    
+    %% service discovery
+    ok=application:start(service_discovery),
+    ok=service_discovery:config_needed(?NeededList),
+    ok=service_discovery:update(),
+    {ok,?NeededList}=service_discovery:needed(),    
+    {ok,[{add_test,NodeAddTest,PidAddTest}]}=service_discovery:get_all(add_test),
+    {ok,PidAddTest}=client:server_pid(add_test),
+    {ok,pong}=client:call(PidAddTest,{ping,[]},5000),
     %% Check applications are correct started
     pong=rpc:call(get_node(?NodeName),log,ping,[],5000),
-    pong=sd:call(add_test,{ping},5000),
+    
     %% Change
     
     ok.
